@@ -25,6 +25,10 @@ RUN apt-get -y update && \
 RUN pecl install xdebug-3.0.4 && \
     docker-php-ext-enable xdebug
 
+# Install gzip
+RUN apt-get install -y libzip-dev \
+     && docker-php-ext-install zip
+
 # Install redis
 #RUN pecl install redis-5.0.2 && \
 #    docker-php-ext-enable redis
