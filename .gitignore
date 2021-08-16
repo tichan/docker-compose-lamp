@@ -2,6 +2,5 @@
 /.vscode
 /data/*
 /logs/*
-/www/**
-.DS_Store
 /www/*
+.DS_Store
