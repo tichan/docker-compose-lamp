@@ -4,7 +4,7 @@ services:
   webserver:
     build: 
       context: ./bin/php73
-    container_name: 'lamp-stack'
+    container_name: 'zencart'
     restart: 'always'
     ports:
       - 8081:80
@@ -25,7 +25,7 @@ services:
   database:
     build:
       context: "./bin/mariadb"
-    container_name: lamp-stack-database
+    container_name: zencart-database
     restart: 'always'
     volumes: 
       - ./data/mysql:/var/lib/mysql

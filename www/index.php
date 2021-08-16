@@ -1,66 +1,102 @@
-<!DOCTYPE html>
-<html lang="en">
-    <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>LAMP STACK</title>
-        <link rel="stylesheet" href="/assets/css/bulma.min.css">
-    </head>
-    <body>
-        <section class="hero is-medium is-info is-bold">
-            <div class="hero-body">
-                <div class="container has-text-centered">
-                    <h1 class="title">
-                        LAMP STACK
-                    </h1>
-                    <h2 class="subtitle">
-                        Your local development environment
-                    </h2>
-                </div>
-            </div>
-        </section>
-        <section class="section">
-            <div class="container">
-                <div class="columns">
-                    <div class="column">
-                        <h3 class="title is-3 has-text-centered">Environment</h3>
-                        <hr>
-                        <div class="content">
-                            <ul>
-                                <li><?= apache_get_version(); ?></li>
-                                <li>PHP <?= phpversion(); ?></li>
-                                <li>
-                                    <?php
-                                    $link = mysqli_connect("database", "root", $_ENV['MYSQL_ROOT_PASSWORD'], null);
+<?php
+/**
+ * index.php represents the hub of the Zen Cart MVC system
+ * 
+ * Overview of flow
+ * <ul>
+ * <li>Load application_top.php - see {@tutorial initsystem}</li>
+ * <li>Set main language directory based on $_SESSION['language']</li>
+ * <li>Load all *header_php.php files from includes/modules/pages/PAGE_NAME/</li>
+ * <li>Load html_header.php (this is a common template file)</li>
+ * <li>Load main_template_vars.php (this is a common template file)</li>
+ * <li>Load on_load scripts (page based and site wide)</li>
+ * <li>Load tpl_main_page.php (this is a common template file)</li>
+ * <li>Load application_bottom.php</li>
+ * </ul>
+ *
+ * @copyright Copyright 2003-2020 Zen Cart Development Team
+ * @copyright Portions Copyright 2003 osCommerce
+ * @license http://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
+ * @version $Id: DrByte 2020 Jun 16 Modified in v1.5.7 $
+ */
+/**
+ * Load common library stuff 
+ */
+  require('includes/application_top.php');
 
-/* check connection */
-                                    if (mysqli_connect_errno()) {
-                                        printf("MySQL connecttion failed: %s", mysqli_connect_error());
-                                    } else {
-                                        /* print server version */
-                                        printf("MySQL Server %s", mysqli_get_server_info($link));
-                                    }
-                                    /* close connection */
-                                    mysqli_close($link);
-                                    ?>
-                                </li>
-                            </ul>
-                        </div>
-                    </div>
-                    <div class="column">
-                        <h3 class="title is-3 has-text-centered">Quick Links</h3>
-                        <hr>
-                        <div class="content">
-                            <ul>
-                                <li><a href="/phpinfo.php">phpinfo()</a></li>
-                                <li><a href="http://localhost:<? print $_ENV['PMA_PORT']; ?>">phpMyAdmin</a></li>
-                                <li><a href="/test_db.php">Test DB Connection with mysqli</a></li>
-                                <li><a href="/test_db_pdo.php">Test DB Connection with PDO</a></li>
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
-    </body>
+  $language_page_directory = DIR_WS_LANGUAGES . $_SESSION['language'] . '/';
+  $directory_array = $template->get_template_part($code_page_directory, '/^header_php/');
+  foreach ($directory_array as $value) { 
+/**
+ * We now load header code for a given page. 
+ * Page code is stored in includes/modules/pages/PAGE_NAME/directory 
+ * 'header_php.php' files in that directory are loaded now.
+ */
+    require($code_page_directory . '/' . $value);
+  }
+/**
+ * We now load the html_header.php file. This file contains code that would appear within the HTML <head></head> code 
+ * it is overridable on a template and page basis. 
+ * In that a custom template can define its own common/html_header.php file 
+ */
+  require($template->get_template_dir('html_header.php',DIR_WS_TEMPLATE, $current_page_base,'common'). '/html_header.php');
+/**
+ * Define Template Variables picked up from includes/main_template_vars.php unless a file exists in the
+ * includes/pages/{page_name}/directory to overide. Allowing different pages to have different overall
+ * templates.
+ */
+  require($template->get_template_dir('main_template_vars.php',DIR_WS_TEMPLATE, $current_page_base,'common'). '/main_template_vars.php');
+/**
+ * Read the "on_load" scripts for the individual page, and from the site-wide template settings
+ * NOTE: on_load_*.js files must contain just the raw code to be inserted in the <body> tag in the on_load="" parameter.
+ * Looking in "/includes/modules/pages" for files named "on_load_*.js"
+ */
+  $directory_array = $template->get_template_part(DIR_WS_MODULES . 'pages/' . $current_page_base, '/^on_load_/', '.js');
+  foreach ($directory_array as $value) { 
+    $onload_file = DIR_WS_MODULES . 'pages/' . $current_page_base . '/' . $value;
+    $read_contents='';
+    if ($lines = @file($onload_file)) {
+      $read_contents = implode('', $lines);
+    }
+  $za_onload_array[] = $read_contents;
+  }
+/**
+ * now read "includes/templates/TEMPLATE/jscript/on_load/on_load_*.js", which would be site-wide settings
+ */
+  $directory_array=array();
+  $tpl_dir=$template->get_template_dir('.js', DIR_WS_TEMPLATE, 'jscript/on_load', 'jscript/on_load_');
+  $directory_array = $template->get_template_part($tpl_dir ,'/^on_load_/', '.js');
+  foreach ($directory_array as $value) { 
+    $onload_file = $tpl_dir . '/' . $value;
+    $read_contents='';
+    if ($lines = @file($onload_file)) {
+      $read_contents = implode('', $lines);
+    }
+    $za_onload_array[] = $read_contents;
+  }
+
+  // set $zc_first_field for backwards compatibility with previous version usage of this var
+  if (isset($zc_first_field) && $zc_first_field !='') $za_onload_array[] = $zc_first_field;
+
+  $zv_onload = "";
+  if (isset($za_onload_array) && count($za_onload_array)>0) $zv_onload=implode(';',$za_onload_array);
+
+  //ensure we have just one ';' between each, and at the end
+  $zv_onload = str_replace(';;',';',$zv_onload.';');
+
+  // ensure that a blank list is truly blank and thus ignored.
+  if (trim($zv_onload) == ';') $zv_onload='';
+/**
+ * Define the template that will govern the overall page layout, can be done on a page by page basis
+ * or using a default template. The default template installed will be a standard 3 column layout. This
+ * template also loads the page body code based on the variable $body_code.
+ */
+  require($template->get_template_dir('tpl_main_page.php',DIR_WS_TEMPLATE, $current_page_base,'common'). '/tpl_main_page.php');
+?>
 </html>
+<?php
+/**
+ * Load general code run before page closes
+ */
+?>
+<?php require(DIR_WS_INCLUDES . 'application_bottom.php'); ?>
